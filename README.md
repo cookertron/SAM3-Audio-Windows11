@@ -22,6 +22,12 @@ SAM-Audio and the Judge model crucially rely on [Perception-Encoder Audio-Visual
 - Python >= 3.11
 - CUDA-compatible GPU (recommended)
 
+Install dependencies:
+
+```bash
+pip install .
+```
+
 ## Windows Portable Setup (No Manual Install Required)
 
 If you downloaded the portable package or want to install easily on Windows:
@@ -54,11 +60,14 @@ need to be authenticated to download the checkpoints. You can do this by running
 the following [steps](https://huggingface.co/docs/huggingface_hub/en/quick-start#authentication)
 (e.g. `hf auth login` after generating an access token.)
 
-### Basic Text Prompting
+### Basic Text Prompting (Portable Version)
+
+**Note:** "Visual Prompting", "Span Prompting", and "Re-Ranking" are **disabled** in this portable Windows build to ensure compatibility and stability without heavy dependencies like `xformers` and `torchcodec`.
 
 ```python
 from sam_audio import SAMAudio, SAMAudioProcessor
-import torchaudio
+# import torchaudio -- Replaced with soundfile in portable build
+import soundfile as sf
 import torch
 
 model = SAMAudio.from_pretrained("facebook/sam-audio-large")
@@ -106,7 +115,9 @@ SAM-Audio supports three types of prompts:
 
 See the [examples](examples) directory for more detailed examples
 
-### Span Prediction (Optional for Text Prompting)
+### Span Prediction (Disabled in Portable Build)
+
+*This feature relies on `xformers` and is currently disabled in the Windows Portable version.*
 
 We also provide support for automatically predicting the spans based on the text description, which is especially helpful for separating non-ambience sound events.  You can enable this by adding `predict_spans=True` in your call to `separate`
 
@@ -119,7 +130,9 @@ with torch.inference_mode():
    outputs = model.separate(batch, predict_spans=True, reranking_candidates=8)
 ```
 
-### Re-Ranking
+### Re-Ranking (Disabled in Portable Build)
+
+*This feature relies on `xformers` and external rankers, which are disabled in the Windows Portable version.*
 
 We provide the following models to assess the quality of the separated audio:
 
