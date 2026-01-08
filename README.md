@@ -6,7 +6,7 @@
 ![CI](https://github.com/facebookresearch/sam-audio/actions/workflows/ci.yaml/badge.svg)
 [![Hugging Face](https://img.shields.io/badge/HuggingFace-Collection-orange?logo=huggingface)](https://huggingface.co/collections/facebook/sam-audio)
 
-![model_image](assets/sam_audio_main_model.png)
+![model_image](assets/GUI_Screenshot.png)
 
 </div>
 
