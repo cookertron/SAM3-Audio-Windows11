@@ -1,0 +1,182 @@
+python.exe : 
+Traceback (most 
+recent call last):
+At line:1 char:1
++ & 'd:\Python310\pyth
+on.exe' main.py 
+--help 2>&1 | 
+Out-File -Encoding  
+...
++ ~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
+~~~~~
+    + CategoryInfo    
+          : NotSpeci  
+  fied: (Traceback    
+ (most recent call    
+ last)::String) [    
+], RemoteExceptio    n
+    + FullyQualifiedE 
+   rrorId : NativeCo  
+  mmandError
+ 
+  File "D:\sam-audio-m
+ain\eval\main.py", 
+line 15, in <module>
+    from dataset 
+import SETTINGS, 
+make_dataset
+  File "D:\sam-audio-m
+ain\eval\dataset\__ini
+t__.py", line 5, in 
+<module>
+    from .musdb 
+import MUSDB
+  File "D:\sam-audio-m
+ain\eval\dataset\musdb
+.py", line 9, in 
+<module>
+    from 
+torchcodec.decoders 
+import AudioDecoder
+  File "D:\Python310\l
+ib\site-packages\torch
+codec\__init__.py", 
+line 12, in <module>
+    from . import 
+decoders, encoders, 
+samplers  # noqa
+  File "D:\Python310\l
+ib\site-packages\torch
+codec\decoders\__init_
+_.py", line 7, in 
+<module>
+    from .._core 
+import 
+AudioStreamMetadata, 
+VideoStreamMetadata
+  File "D:\Python310\l
+ib\site-packages\torch
+codec\_core\__init__.p
+y", line 8, in 
+<module>
+    from ._metadata 
+import (
+  File "D:\Python310\l
+ib\site-packages\torch
+codec\_core\_metadata.
+py", line 16, in 
+<module>
+    from 
+torchcodec._core.ops 
+import (
+  File "D:\Python310\l
+ib\site-packages\torch
+codec\_core\ops.py", 
+line 104, in <module>
+    
+ffmpeg_major_version, 
+core_library_path = lo
+ad_torchcodec_shared_l
+ibraries()
+  File "D:\Python310\l
+ib\site-packages\torch
+codec\_core\ops.py", 
+line 75, in load_torch
+codec_shared_libraries
+    raise 
+RuntimeError(
+RuntimeError: Could 
+not load 
+libtorchcodec. Likely 
+causes:
+          1. FFmpeg 
+is not properly 
+installed in your 
+environment. We 
+support
+             versions 
+4, 5, 6, 7, and 8. On 
+Windows, ensure 
+you've installed
+             the 
+"full-shared" version 
+which ships DLLs.
+          2. The 
+PyTorch version 
+(2.5.1+cu121) is not 
+compatible with
+             this 
+version of 
+TorchCodec. Refer to 
+the version 
+compatibility
+             table:
+             https://g
+ithub.com/pytorch/torc
+hcodec?tab=readme-ov-f
+ile#installing-torchco
+dec.
+          3. Another 
+runtime dependency; 
+see exceptions below.
+        The following 
+exceptions were 
+raised as we tried to 
+load libtorchcodec:
+        
+[start of 
+libtorchcodec loading 
+traceback]
+FFmpeg version 8: 
+Could not find module 
+'D:\Python310\Lib\site
+-packages\torchcodec\l
+ibtorchcodec_core8.dll
+' (or one of its 
+dependencies). Try 
+using the full path 
+with constructor 
+syntax.
+FFmpeg version 7: 
+Could not find module 
+'D:\Python310\Lib\site
+-packages\torchcodec\l
+ibtorchcodec_core7.dll
+' (or one of its 
+dependencies). Try 
+using the full path 
+with constructor 
+syntax.
+FFmpeg version 6: 
+Could not find module 
+'D:\Python310\Lib\site
+-packages\torchcodec\l
+ibtorchcodec_core6.dll
+' (or one of its 
+dependencies). Try 
+using the full path 
+with constructor 
+syntax.
+FFmpeg version 5: 
+Could not find module 
+'D:\Python310\Lib\site
+-packages\torchcodec\l
+ibtorchcodec_core5.dll
+' (or one of its 
+dependencies). Try 
+using the full path 
+with constructor 
+syntax.
+FFmpeg version 4: 
+Could not find module 
+'D:\Python310\Lib\site
+-packages\torchcodec\l
+ibtorchcodec_core4.dll
+' (or one of its 
+dependencies). Try 
+using the full path 
+with constructor 
+syntax.
+[end of libtorchcodec 
+loading traceback].

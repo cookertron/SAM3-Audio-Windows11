@@ -1,0 +1,19 @@
+# Core Dependencies (Windows Patched)
+# Torch installed separately in setup_windows.bat to ensure CUDA version
+
+
+transformers>=4.54.0
+numpy
+einops
+pydub
+huggingface_hub
+soundfile
+PyQt6
+
+# Git Dependencies
+dacvae @ git+https://github.com/facebookresearch/dacvae.git
+imagebind @ git+https://github.com/facebookresearch/ImageBind.git
+audiobox_aesthetics
+
+# Note: perception-models, xformers, and torchcodec are intentionally omitted
+# as they are incompatible or patched out for this Windows build.
