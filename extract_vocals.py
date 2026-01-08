@@ -49,6 +49,107 @@ def setup_model_dir():
 
     return CHECKPOINT_DIR
 
+def process_in_chunks(model, processor, audio_path, prompts, chunk_seconds=30):
+    """
+    Processes audio in chunks to avoid OOM on large files.
+    """
+    import soundfile as sf
+    import numpy as np
+    
+    # Load full audio info
+    info = sf.info(audio_path)
+    sr = info.samplerate
+    total_frames = info.frames
+    duration = total_frames / sr
+    
+    print(f"DEBUG: Audio duration: {duration:.2f}s, Sample Rate: {sr}")
+    
+    # Calculate chunk size in frames
+    # SAM Audio works at 48kHz usually, processor handles resampling
+    # We'll read from the file directly in chunks to be safe on RAM too, 
+    # but simplest is read all to RAM (numpy) then slice.
+    
+    # Using soundfile to read as numpy array
+    full_audio, file_sr = sf.read(audio_path)
+    if len(full_audio.shape) > 1:
+        # Mix to mono for simple processing/chunking logic (model handles mono/stereo usually but let's stick to what worked)
+        # Processor `batch_audio` handles it. 
+        # But here we need to slice raw audio.
+        # Let's keep distinct channels if present.
+        pass
+        # Actually processor converts to tensor.
+    
+    chunks = []
+    chunk_size_samples = int(chunk_seconds * file_sr)
+    
+    # Iterate
+    full_target_wavs = []
+    full_residual_wavs = []
+    
+    print(f"Processing in {chunk_seconds}s chunks...")
+    
+    for start in range(0, len(full_audio), chunk_size_samples):
+        end = min(start + chunk_size_samples, len(full_audio))
+        chunk_data = full_audio[start:end]
+        
+        # Save chunk to temp file or pass tensor directly?
+        # processor accepts list of str OR tensors.
+        # Let's use tensors to avoid disk I/O
+        
+        # Convert to torch tensor
+        # soundfile returns (frames, channels) or (frames,)
+        chunk_tensor = torch.from_numpy(chunk_data).float()
+        
+        # SAMAudioProcessor expects (channels, time) for tensor input or just file path
+        if chunk_tensor.ndim == 1:
+            chunk_tensor = chunk_tensor.unsqueeze(0) # (1, time)
+        else:
+            chunk_tensor = chunk_tensor.t() # (time, channels) -> (channels, time)
+            
+        # Process this chunk
+        try:
+            batch = processor(
+                audios=[chunk_tensor],
+                descriptions=prompts,
+            )
+            if torch.cuda.is_available():
+                batch = batch.to("cuda")
+                
+            with torch.inference_mode():
+                # Running separate on chunk
+                result = model.separate(batch, predict_spans=False, reranking_candidates=1)
+                
+            # Collect results (numpy)
+            # result.target is list of wavs. [0] is our result.
+            # Shape: [1, length] ?
+            # Let's convert to numpy T to match sf.write expectation (time, channels)
+            
+            t_wav = result.target[0].cpu().numpy().T
+            r_wav = result.residual[0].cpu().numpy().T
+            
+            full_target_wavs.append(t_wav)
+            full_residual_wavs.append(r_wav)
+            
+            print(f"  Processed chunk {start/file_sr:.1f}s - {end/file_sr:.1f}s")
+            
+            # Clear cache to free VRAM
+            del batch, result
+            torch.cuda.empty_cache()
+            
+        except Exception as e:
+            print(f"Error processing chunk starting at {start}: {e}")
+            import traceback
+            traceback.print_exc()
+            # If a chunk fails, we might want to fill silence or abort.
+            return None, None
+
+    # Concatenate
+    final_target = np.concatenate(full_target_wavs, axis=0)
+    final_residual = np.concatenate(full_residual_wavs, axis=0)
+    
+    return final_target, final_residual
+
+
 def extract_vocals(audio_path, output_dir=".", prompts=["vocals"]):
     """Extracts audio based on the given prompts from the audio file."""
     try:
@@ -71,14 +172,11 @@ def extract_vocals(audio_path, output_dir=".", prompts=["vocals"]):
         model = model.eval()
         if torch.cuda.is_available():
             print(f"CUDA available: {torch.cuda.is_available()}")
-            print(f"Device count: {torch.cuda.device_count()}")
-            print(f"Current device: {torch.cuda.current_device()}")
+            # print(f"Device count: {torch.cuda.device_count()}")
+            # print(f"Current device: {torch.cuda.current_device()}")
             print(f"Device name: {torch.cuda.get_device_name(0)}")
             model = model.cuda()
             print("Model loaded on CUDA.")
-            # Verify a parameter is on CUDA
-            param_device = next(model.parameters()).device
-            print(f"Model parameter device: {param_device}")
         else:
             print("Model loaded on CPU.")
     except Exception as e:
@@ -87,79 +185,41 @@ def extract_vocals(audio_path, output_dir=".", prompts=["vocals"]):
 
     print(f"Processing audio: {audio_path}")
     print(f"Prompts: {prompts}")
-    
-    descriptions = prompts
 
-    # Prepare batch
-    # Note: SAMAudioProcessor handles loading and resampling
+    # Process
     try:
-        batch = processor(
-            audios=[audio_path],
-            descriptions=descriptions,
-        )
-        if torch.cuda.is_available():
-           batch = batch.to("cuda")
+        # Use chunking if file is long? Or always use it to be safe?
+        # Let's always use chunking for robustness, or checking length.
+        # But for logic simplicity, let's just call the chunker. 
+        # It handles the full flow natively.
+        
+        target_wav, residual_wav = process_in_chunks(model, processor, audio_path, prompts, chunk_seconds=30)
+        
+        if target_wav is None:
+            print("Processing failed.")
+            sys.exit(1)
+
+        # Save output
+        sample_rate = processor.audio_sampling_rate
+        base_name = os.path.splitext(os.path.basename(audio_path))[0]
+        
+        description_sanitized = prompts[0].replace(" ", "_")
+        target_path = os.path.join(output_dir, f"{base_name}_{description_sanitized}.wav")
+        residual_path = os.path.join(output_dir, f"{base_name}_residual.wav")
+
+        print(f"Saving outputs to {output_dir}")
+        sf.write(target_path, target_wav, sample_rate)
+        sf.write(residual_path, residual_wav, sample_rate)
+        
+        print("Done!")
+        print(f"  Target: {target_path}")
+        print(f"  Residual: {residual_path}")
+        
     except Exception as e:
         print(f"Error processing audio input: {e}")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
-
-    print("Running separation...")
-    with torch.inference_mode():
-        # Using default parameters for balance of speed/quality
-        # predict_spans=True can help if vocals are sparse, but False is safer for general tracks
-        result = model.separate(batch, predict_spans=False, reranking_candidates=1)
-
-    # Save output
-    sample_rate = processor.audio_sampling_rate
-    base_name = os.path.splitext(os.path.basename(audio_path))[0]
-    
-    # Iterate through results (handling multiple prompts if we supported batching multiple prompts, 
-    # but separate returns a BatchResult. target is [B, T]. B=1 here unless we batch prompts differently?
-    # SAMAudio.separate returns result where result.target is [BatchSize, Time] corresponding to descriptions.
-    # But wait, processor documentation says descriptions list length matching audios?
-    # Actually, SAMAudioProcessor takes `descriptions` matching `audios` length.
-    # If we want 1 audio with N prompts, we usually need to repeat the audio.
-    # Let's check if the current implementation supports 1 audio : 1 prompt. 
-    # Yes, typically 1 input audio matches 1 description.
-    # If we pass prompts=["vocals"], len=1. 
-    # If users wants multiple prompts at once, we should technically handle that. 
-    # BUT for simplicity, let's assume prompts is a LIST of length 1 for now, or we re-implement to separate loop.
-    # Actually, to support multiple prompts properly with the current processor structure (1-to-1 audio-desc),
-    # we might just take the first prompt for now or loop.
-    # Let's assume prompts[0] is the main one for this single-file function.
-    
-    # Wait, if we want to extract different things, we could iterate.
-    # But for now, let's stick to the FIRST prompt in the list to match current behavior 1:1.
-    
-    # Re-reading processor.py:
-    # assert self.audios.size(0) == len(self.descriptions)
-    # So if we have 1 audio file and want multiple prompts, we'd need to duplicate the audio file string in the list passed to processor.
-    
-    # Let's stick to single prompt extraction for this function signature update to keep it simple and robust.
-    # Or, we handle the multi-prompt logic here.
-    # Let's loop here if len(prompts) > 1? No, better to stick to 1 prompt per call for clarity,
-    # OR replicate the audio list.
-    
-    # Let's assume prompts is meant to be a single string for valid "extraction" context (one target).
-    # IF the user passes multiple, we'll just use the first one and warn? 
-    # Or we construct the batch correctly. 
-    
-    # Let's just output specifically for the first prompt.
-    description_sanitized = prompts[0].replace(" ", "_")
-    target_path = os.path.join(output_dir, f"{base_name}_{description_sanitized}.wav")
-    residual_path = os.path.join(output_dir, f"{base_name}_residual.wav")
-
-    print(f"Saving outputs to {output_dir}")
-    
-    # Use soundfile directly to avoid torchaudio backend issues
-    target_wav = result.target[0].cpu().numpy().T
-    residual_wav = result.residual[0].cpu().numpy().T
-    sf.write(target_path, target_wav, sample_rate)
-    sf.write(residual_path, residual_wav, sample_rate)
-    
-    print("Done!")
-    print(f"  Target: {target_path}")
-    print(f"  Residual: {residual_path}")
 
 if __name__ == "__main__":
     setup_model_dir()
@@ -174,3 +234,4 @@ if __name__ == "__main__":
         sys.exit(1)
         
     extract_vocals(audio_file)
+
